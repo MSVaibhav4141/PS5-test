@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Haptic Bench · Test your PS5 controller in the browser</title>
+<meta name="description" content="Test your PS5 DualSense controller in the browser: rumble motors, adaptive triggers, lightbar, buttons, touchpad and motion sensors. Nothing to install.">
+<meta property="og:title" content="Haptic Bench">
+<meta property="og:description" content="Feel every motor and trigger on your PS5 controller, right in the browser.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#2E55E6">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F6;--panel:#FFFFFF;--ink:#18202E;--muted:#5C6677;--line:#D5DBE5;
+  --accent:#2E55E6;--accent-ink:#FFFFFF;--accent-soft:#DCE4FF;--hot:#E2475B;--ok:#1E9E62;--well:#E3E8F0;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#12161F;--panel:#1B212D;--ink:#E6EAF2;--muted:#97A1B3;--line:#2C3443;
+    --accent:#7B98FF;--accent-ink:#0E1320;--accent-soft:#232D4A;--hot:#FF6B7D;--ok:#3DD68C;--well:#252C3A;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12161F;--panel:#1B212D;--ink:#E6EAF2;--muted:#97A1B3;--line:#2C3443;
+  --accent:#7B98FF;--accent-ink:#0E1320;--accent-soft:#232D4A;--hot:#FF6B7D;--ok:#3DD68C;--well:#252C3A;
+  color-scheme:dark;
+}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 70px);scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Sora",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:15px;line-height:1.55}
+a{color:var(--accent)}
+.wrap{max-width:1100px;margin:0 auto;padding:0 20px}
+
+/* Coming-soon strip */
+.soon{background:var(--accent);color:var(--accent-ink)}
+.soon .wrap{display:flex;align-items:center;gap:12px;padding-top:10px;padding-bottom:10px;font-size:14px}
+.soon p{margin:0;flex:1}
+.soon a{color:inherit;font-weight:700}
+.soon button{background:transparent;border:1px solid currentColor;color:inherit;padding:4px 10px;font-size:13px}
+.soon.hidden{display:none}
+
+/* Top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:21;
+  background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;gap:12px}
+.brand{font-weight:800;font-size:18px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
+.brand-mark{width:28px;height:28px;border-radius:9px;background:var(--accent);display:grid;place-items:center}
+.brand-mark span{width:10px;height:10px;border-radius:50%;background:var(--accent-ink);animation:buzz 2.4s infinite}
+@keyframes buzz{0%,80%,100%{transform:none}84%{transform:translateX(-2px)}88%{transform:translateX(2px)}92%{transform:translateX(-1px)}}
+@media (prefers-reduced-motion:reduce){.brand-mark span{animation:none}}
+.top nav{display:flex;gap:18px;font-size:14px}
+.top nav a{color:var(--muted);text-decoration:none;font-weight:600}
+.top nav a:hover{color:var(--ink)}
+.pill{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:6px 12px;background:var(--panel);white-space:nowrap}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--hot);display:inline-block;flex:none}
+.dot.on{background:var(--ok)}
+@media (max-width:720px){.top nav{display:none}}
+
+/* Hero */
+.hero{padding:56px 0 34px;display:grid;grid-template-columns:1.3fr 1fr;gap:40px;align-items:center}
+@media (max-width:860px){.hero{grid-template-columns:1fr;padding-top:36px}}
+.hero h1{font-size:clamp(34px,6vw,60px);line-height:1.02;margin:0 0 16px;font-weight:800;letter-spacing:-.035em}
+.hero p.lead{font-size:17px;color:var(--muted);margin:0 0 24px;max-width:52ch}
+.cta{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.steps{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;margin:0;list-style:none;counter-reset:s}
+.steps li{counter-increment:s;display:grid;grid-template-columns:34px 1fr;gap:12px;padding:10px 0}
+.steps li+li{border-top:1px solid var(--line)}
+.steps li::before{content:counter(s);width:30px;height:30px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700}
+.steps b{display:block}
+.steps span{color:var(--muted);font-size:14px}
+
+button{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+  padding:9px 14px;border-radius:10px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);padding:14px 22px;font-size:16px;border-radius:12px}
+button.stop{color:var(--hot);border-color:var(--hot)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.support{font-size:14px;color:var(--muted);display:flex;align-items:center;gap:8px}
+
+.msg{background:var(--panel);border:1px solid var(--hot);border-left-width:4px;border-radius:12px;padding:12px 14px;margin-bottom:18px;display:none}
+.msg.show{display:block}
+
+/* Panels */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr));gap:18px;margin-bottom:18px}
+section.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px}
+section.wide{grid-column:1/-1}
+.locked section.panel.needs{opacity:.55}
+h2{font-size:21px;margin:0 0 4px;font-weight:700;letter-spacing:-.01em}
+.hint{color:var(--muted);font-size:14px;margin:0 0 16px;max-width:70ch}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+label.slider{display:grid;grid-template-columns:1fr auto;gap:2px 10px;margin:12px 0}
+label.slider span:first-child{font-weight:600;font-size:14px}
+label.slider output{color:var(--muted);font-variant-numeric:tabular-nums;font-size:14px}
+label.slider input{grid-column:1/-1;width:100%;accent-color:var(--accent)}
+select{font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.triggers{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:26px}
+.trig{display:grid;grid-template-columns:60px 1fr;gap:18px;align-items:start}
+.gauge{height:220px;border-radius:30px 30px 12px 12px;background:var(--well);position:relative;overflow:hidden;border:1px solid var(--line)}
+.gauge .fill{position:absolute;left:0;right:0;top:0;height:0;background:var(--accent);transition:height .03s linear}
+.gauge .zone{position:absolute;left:0;right:0;border-top:2px dashed var(--hot)}
+.gauge .lbl{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-weight:700;font-size:14px;mix-blend-mode:difference;color:#fff}
+.trig h3{margin:0 0 6px;font-size:17px}
+.leds{display:flex;gap:8px}
+.leds button{width:38px;height:38px;padding:0;border-radius:50%}
+.leds button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+input[type=color]{width:56px;height:40px;border:1px solid var(--line);border-radius:10px;background:none;padding:2px;cursor:pointer}
+.swatch{width:40px;height:40px;padding:0;border-radius:10px}
+.input-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:20px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:5px 10px;border-radius:999px;border:1px solid var(--line);font-size:13px;color:var(--muted)}
+.chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.input-split{display:grid;grid-template-columns:auto 1fr;gap:32px;align-items:start;margin-bottom:26px}
+@media (max-width:860px){.input-split{grid-template-columns:1fr}}
+.sticks{display:flex;gap:18px;flex-wrap:wrap}
+figure.stick{margin:0;text-align:center}
+figure.stick canvas{width:160px;height:160px;display:block;border-radius:50%;background:var(--well);border:2px solid var(--line);transition:border-color .15s,box-shadow .15s}
+figure.stick.pressed canvas{border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 25%,transparent)}
+figcaption{font-size:13px;color:var(--muted);margin-top:8px;font-variant-numeric:tabular-nums}
+figcaption b{color:var(--ink)}
+.drift{margin-top:14px;display:grid;gap:6px;font-size:14px}
+.drift .res{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.drift .res.good{border-color:var(--ok)}
+.drift .res.warn{border-color:#E0A21B}
+.drift .res.bad{border-color:var(--hot)}
+.drift .res b{display:block}
+.drift .res span{color:var(--muted)}
+.pad{width:100%;aspect-ratio:1920/1080;background:var(--well);border:2px solid var(--line);border-radius:20px;position:relative;overflow:hidden;
+  transition:background-color .2s,border-color .2s,box-shadow .2s}
+.pad.clicked{background:color-mix(in srgb,var(--accent) 35%,var(--well));border-color:var(--accent);
+  box-shadow:0 0 0 5px color-mix(in srgb,var(--accent) 28%,transparent),inset 0 0 60px color-mix(in srgb,var(--accent) 45%,transparent)}
+.pad canvas{position:absolute;inset:0;width:100%;height:100%}
+.pad .pad-hint{position:absolute;inset:auto 0 12px;text-align:center;font-size:13px;color:var(--muted);pointer-events:none;transition:opacity .3s}
+.nums{font-variant-numeric:tabular-nums;font-size:13.5px;color:var(--muted);display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:2px 12px}
+.nums b{color:var(--ink);font-weight:600}
+.small-h{font-weight:600;font-size:14px;margin:0 0 8px}
+
+/* Coming soon game card */
+.game{margin:44px 0 18px;border-radius:22px;padding:34px;background:var(--ink);color:var(--bg);display:grid;grid-template-columns:1.2fr 1fr;gap:30px;align-items:center;position:relative;overflow:hidden}
+@media (max-width:860px){.game{grid-template-columns:1fr;padding:26px}}
+.game .tag{display:inline-block;background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700;margin-bottom:14px}
+.game h2{font-size:clamp(26px,4vw,38px);line-height:1.08;margin:0 0 12px;font-weight:800;letter-spacing:-.03em}
+.game p{margin:0;opacity:.8;max-width:52ch}
+.game ul{margin:0;padding:0;list-style:none;display:grid;gap:12px}
+.game li{border:1px solid color-mix(in srgb,var(--bg) 25%,transparent);border-radius:14px;padding:14px 16px}
+.game li b{display:block}
+.game li span{opacity:.75;font-size:14px}
+
+/* FAQ */
+.faq{margin:44px 0}
+.faq h2{margin-bottom:14px}
+details{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin-bottom:10px}
+summary{font-weight:600;cursor:pointer}
+details p{color:var(--muted);margin:10px 0 0}
+
+footer{border-top:1px solid var(--line);padding:26px 0 40px;color:var(--muted);font-size:13px}
+footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
+
+/* Toasts */
+.toasts{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:grid;gap:8px;z-index:50;max-width:min(360px,calc(100% - 32px))}
+.toast{background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:12px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:in .25s ease-out}
+.toast.bad{background:var(--hot);color:#fff}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}}
+</style>
+</head>
+<body>
+
+<div class="soon" id="soon">
+  <div class="wrap">
+    <p>🎮 Coming soon: a full browser game built around rumble and adaptive triggers. <a href="#game">See what’s planned</a></p>
+    <button id="soonClose" aria-label="Dismiss announcement">Dismiss</button>
+  </div>
+</div>
+
+<div class="top">
+  <div class="wrap">
+    <a class="brand" href="#"><span class="brand-mark"><span></span></span>Haptic Bench</a>
+    <nav aria-label="Sections">
+      <a href="#rumble">Rumble</a><a href="#triggers">Triggers</a><a href="#lights">Lights</a><a href="#input">Input</a><a href="#game">Game</a>
+    </nav>
+    <div class="pill"><span class="dot" id="dot"></span><span id="statusText">Not connected</span></div>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="hero">
+    <div>
+      <h1>Feel every motor and trigger on your PS5 controller.</h1>
+      <p class="lead">Test rumble, adaptive triggers, lights, buttons, the touchpad and motion sensors, right here in your browser. Nothing to install.</p>
+      <div class="cta">
+        <button class="primary" id="connectBtn">Connect controller</button>
+        <span class="support" id="support"></span>
+      </div>
+    </div>
+    <ol class="steps">
+      <li><div><b>Plug in with USB</b><span>Use a data cable, not a charge-only one.</span></div></li>
+      <li><div><b>Open in Chrome or Edge</b><span>On a computer. Firefox and Safari can’t talk to controllers yet.</span></div></li>
+      <li><div><b>Connect and play</b><span>Pick “DualSense Wireless Controller” from the popup.</span></div></li>
+    </ol>
+  </div>
+
+  <div class="msg" id="msg" role="alert"></div>
+
+  <div id="controls" class="locked">
+    <div class="grid">
+      <section class="panel needs" id="rumble">
+        <h2>Rumble motors</h2>
+        <p class="hint">The left motor is the deep, heavy buzz. The right one is lighter and sharper.</p>
+        <label class="slider"><span>Left motor (heavy)</span><output id="lOut">0%</output>
+          <input type="range" id="rumbleL" min="0" max="255" value="0"></label>
+        <label class="slider"><span>Right motor (light)</span><output id="rOut">0%</output>
+          <input type="range" id="rumbleR" min="0" max="255" value="0"></label>
+        <div class="row"><button id="pulseBtn">Pulse both for half a second</button></div>
+        <div class="row">
+          <select id="pattern" aria-label="Rumble pattern">
+            <option value="heartbeat">Heartbeat</option>
+            <option value="ramp">Ramp up and down</option>
+            <option value="pingpong">Left and right alternating</option>
+            <option value="engine">Engine idle</option>
+            <option value="rain">Rain</option>
+          </select>
+          <button id="patternBtn">Play pattern</button>
+          <button class="stop" id="stopBtn">Stop everything</button>
+        </div>
+      </section>
+
+      <section class="panel needs" id="lights">
+        <h2>Lights</h2>
+        <p class="hint">Lightbar colour, the five player LEDs under the touchpad, and the mute button light.</p>
+        <div class="row">
+          <input type="color" id="lightColor" value="#2e55e6" aria-label="Pick any lightbar colour">
+          <button class="swatch" data-color="#ff2a2a" style="background:#ff2a2a" aria-label="Red"></button>
+          <button class="swatch" data-color="#22e06b" style="background:#22e06b" aria-label="Green"></button>
+          <button class="swatch" data-color="#2e55e6" style="background:#2e55e6" aria-label="Blue"></button>
+          <button class="swatch" data-color="#c43cff" style="background:#c43cff" aria-label="Purple"></button>
+          <button data-color="#000000">Off</button>
+        </div>
+        <div class="row"><button id="cycleBtn" aria-pressed="false">Colour cycle</button></div>
+        <p class="small-h" style="margin-top:18px">Player LEDs</p>
+        <div class="leds" id="leds">
+          <button aria-pressed="false" data-bit="1">1</button><button aria-pressed="false" data-bit="2">2</button>
+          <button aria-pressed="true" data-bit="4">3</button><button aria-pressed="false" data-bit="8">4</button>
+          <button aria-pressed="false" data-bit="16">5</button>
+        </div>
+        <p class="small-h" style="margin-top:18px">Mute button light</p>
+        <select id="micLed" aria-label="Mute button light">
+          <option value="0">Off</option><option value="1">On</option><option value="2">Pulsing</option>
+        </select>
+      </section>
+
+      <section class="panel wide needs" id="triggers">
+        <h2>Adaptive triggers</h2>
+        <p class="hint">Pick an effect, press Apply, then squeeze the trigger. The bar shows how far it’s pressed; the dashed line marks where the effect kicks in.</p>
+        <div class="triggers">
+          <div class="trig" data-side="l2">
+            <div class="gauge"><div class="fill"></div><div class="zone"></div><div class="lbl">L2</div></div>
+            <div class="trig-controls"></div>
+          </div>
+          <div class="trig" data-side="r2">
+            <div class="gauge"><div class="fill"></div><div class="zone"></div><div class="lbl">R2</div></div>
+            <div class="trig-controls"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel wide needs" id="input">
+        <h2>Live input</h2>
+        <p class="hint">Everything you press, tilt or touch shows up here. Spin the sticks around the edge to check their range, and draw on the touchpad to see your trail.</p>
+        <div class="input-split">
+          <div>
+            <p class="small-h">Sticks</p>
+            <div class="sticks">
+              <figure class="stick" id="stickLWrap"><canvas id="stickL"></canvas><figcaption>Left <b id="lVal">0.00, 0.00</b></figcaption></figure>
+              <figure class="stick" id="stickRWrap"><canvas id="stickR"></canvas><figcaption>Right <b id="rVal">0.00, 0.00</b></figcaption></figure>
+            </div>
+            <div class="row"><button id="driftBtn">Check for stick drift</button></div>
+            <div class="drift" id="driftResult" aria-live="polite"></div>
+          </div>
+          <div>
+            <p class="small-h">Touchpad</p>
+            <div class="pad" id="pad"><canvas id="padCanvas"></canvas><div class="pad-hint" id="padHint">Draw with one or two fingers. Press down to click.</div></div>
+          </div>
+        </div>
+        <div class="input-grid">
+          <div><p class="small-h">Buttons</p><div class="chips" id="chips"></div></div>
+          <div><p class="small-h">Motion sensors</p>
+            <div class="nums">
+              <span></span><b>X</b><b>Y</b><b>Z</b>
+              <span>Gyro</span><span id="gx">0</span><span id="gy">0</span><span id="gz">0</span>
+              <span>Accel</span><span id="ax">0</span><span id="ay">0</span><span id="az">0</span>
+            </div>
+            <p class="small-h" style="margin-top:14px">Battery</p>
+            <span id="battery" class="hint">Connect to see battery level</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel" id="gpSection">
+      <h2>Quick rumble check</h2>
+      <p class="hint">One full-strength buzz for a second. If you’ve connected above, it uses that connection. If the Connect button doesn’t work in your browser, it falls back to the browser’s basic gamepad support instead; press any button on the controller first so the browser notices it.</p>
+      <div class="row"><button id="gpBtn">Rumble for one second</button><span id="gpStatus" class="hint" style="margin:0"></span></div>
+    </section>
+  </div>
+
+  <section class="game" id="game">
+    <div>
+      <span class="tag">Coming soon</span>
+      <h2>A game you play with your fingertips.</h2>
+      <p>We’re building a short browser game designed around the controller itself: every shot, footstep and surface comes through the motors and triggers, not just the screen. Same setup as this page, no download needed.</p>
+    </div>
+    <ul>
+      <li><b>Triggers that fight back</b><span>Bow strings, stiff brakes and jammed guns you can actually feel.</span></li>
+      <li><b>Rumble you can read</b><span>Find hidden things by the buzz in your hands.</span></li>
+      <li><b>Lightbar as a health bar</b><span>Your controller glows to show how you’re doing.</span></li>
+    </ul>
+  </section>
+
+  <section class="faq">
+    <h2>Common questions</h2>
+    <details><summary>The page connects but I can’t feel anything</summary>
+      <p>Another app is probably holding on to the controller. Fully quit Steam (including the tray icon), DS4Windows, DSX or similar tools, unplug the controller, plug it back in and reload the page.</p></details>
+    <details><summary>Does it work over Bluetooth?</summary>
+      <p>Not yet. Bluetooth uses a different message format, so please use a USB cable for now.</p></details>
+    <details><summary>Is this the same as the haptics in PS5 games?</summary>
+      <p>Close, but not identical. The most detailed PS5 haptics are sent to the controller as an audio signal, which browsers can’t do reliably. This page drives the same motors the way PC games do, plus the full adaptive trigger effects.</p></details>
+    <details><summary>Does it work on Linux?</summary>
+      <p>Yes, but you may need a udev rule so your browser is allowed to access the controller’s HID device.</p></details>
+    <details><summary>Is my data sent anywhere?</summary>
+      <p>No. Everything happens in your browser. Nothing about your controller is uploaded.</p></details>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Haptic Bench is an independent fan project and isn’t affiliated with or endorsed by Sony Interactive Entertainment.</span>
+    <span>PlayStation, PS5 and DualSense are trademarks of Sony Interactive Entertainment Inc.</span>
+  </div>
+</footer>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+(() => {
+  const SONY = 0x054c;
+  const PIDS = [0x0ce6, 0x0df2]; // DualSense, DualSense Edge
+  let device = null, firstReport = true, patternTimer = null, sendQueued = false, reportLen = null;
+
+  const state = {
+    rumbleL: 0, rumbleR: 0, color: [0x2e, 0x55, 0xe6], playerLeds: 4, micLed: 0,
+    l2: { mode: 'off', start: 3, end: 6, strength: 6, freq: 30 },
+    r2: { mode: 'off', start: 3, end: 6, strength: 6, freq: 30 },
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const msg = (text) => { const m = $('msg'); m.textContent = text || ''; m.classList.toggle('show', !!text); };
+  function toast(text, bad) {
+    const t = document.createElement('div'); t.className = 'toast' + (bad ? ' bad' : ''); t.textContent = text;
+    $('toasts').appendChild(t); setTimeout(() => t.remove(), 3500);
+  }
+
+  // ---------- Announcement strip ----------
+  try { if (localStorage.getItem('hb-soon-dismissed') === '1') $('soon').classList.add('hidden'); } catch (e) {}
+  $('soonClose').addEventListener('click', () => {
+    $('soon').classList.add('hidden');
+    try { localStorage.setItem('hb-soon-dismissed', '1'); } catch (e) {}
+  });
+
+  // ---------- Browser support ----------
+  if ('hid' in navigator) {
+    $('support').innerHTML = '<span class="dot on"></span>Your browser supports controller access';
+  } else {
+    $('support').innerHTML = '<span class="dot"></span>Use Chrome or Edge on a computer to connect';
+    $('connectBtn').disabled = true;
+  }
+
+  // ---------- Trigger effect encoding ----------
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v | 0));
+  function zoneBytes(position, strength) {
+    let active = 0, force = 0;
+    const s = (clamp(strength, 1, 8) - 1) & 7;
+    for (let i = clamp(position, 0, 9); i < 10; i++) { force |= s << (3 * i); active |= 1 << i; }
+    return [active & 0xff, (active >> 8) & 0xff, force & 0xff, (force >>> 8) & 0xff, (force >>> 16) & 0xff, (force >>> 24) & 0xff];
+  }
+  function triggerBytes(t) {
+    const b = new Array(11).fill(0);
+    switch (t.mode) {
+      case 'resist': b[0] = 0x21; zoneBytes(t.start, t.strength).forEach((v, i) => b[1 + i] = v); break;
+      case 'weapon': {
+        const start = clamp(t.start, 2, 7), end = clamp(t.end, start + 1, 8), z = (1 << start) | (1 << end);
+        b[0] = 0x25; b[1] = z & 0xff; b[2] = (z >> 8) & 0xff; b[3] = clamp(t.strength, 1, 8) - 1; break;
+      }
+      case 'vibrate': b[0] = 0x26; zoneBytes(t.start, t.strength).forEach((v, i) => b[1 + i] = v); b[9] = clamp(t.freq, 1, 255); break;
+      case 'gallop': {
+        const start = clamp(t.start, 0, 8), end = clamp(t.end, start + 1, 9), z = (1 << start) | (1 << end);
+        b[0] = 0x23; b[1] = z & 0xff; b[2] = (z >> 8) & 0xff; b[3] = (4 << 3) | 2; b[4] = clamp(t.freq, 1, 255); break;
+      }
+      default: b[0] = 0x05;
+    }
+    return b;
+  }
+
+  // ---------- Output report (USB, report ID 0x02) ----------
+  function buildReport() {
+    const r = new Uint8Array(47);
+    r[0] = 0x01 | 0x02 | 0x04 | 0x08;
+    r[1] = 0x01 | 0x04 | 0x10;
+    r[2] = state.rumbleR; r[3] = state.rumbleL;
+    r[8] = state.micLed;
+    r.set(triggerBytes(state.r2), 10);
+    r.set(triggerBytes(state.l2), 21);
+    r[38] = 0x04 | (firstReport ? 0x02 : 0);
+    r[41] = firstReport ? 0x02 : 0;
+    r[42] = 0x00;
+    r[43] = state.playerLeds | 0x20;
+    r[44] = state.color[0]; r[45] = state.color[1]; r[46] = state.color[2];
+    return r;
+  }
+  async function send() {
+    if (!device || !device.opened) return;
+    const base = buildReport();
+    const sizes = reportLen ? [reportLen] : [47, 63, 62, 78];
+    let lastErr = null;
+    for (const n of sizes) {
+      const out = new Uint8Array(n); out.set(base.subarray(0, Math.min(n, base.length)), 0);
+      try { await device.sendReport(0x02, out); reportLen = n; firstReport = false; msg(''); return; }
+      catch (e) { lastErr = e; }
+    }
+    reportLen = null;
+    msg('Couldn’t send to the controller (' + lastErr.message + '). Fully quit Steam, DS4Windows, DSX or any other controller app, unplug the controller, plug it back in and reload this page.');
+  }
+  function queueSend() {
+    if (sendQueued) return;
+    sendQueued = true;
+    setTimeout(() => { sendQueued = false; send(); }, 25);
+  }
+
+  // ---------- Connect ----------
+  $('connectBtn').addEventListener('click', async () => {
+    msg('');
+    try {
+      const list = await navigator.hid.requestDevice({ filters: PIDS.map(p => ({ vendorId: SONY, productId: p })) });
+      if (list.length) await open(list[0]);
+    } catch (e) { msg('Couldn’t connect: ' + e.message); }
+  });
+
+  async function open(d) {
+    device = d;
+    if (!device.opened) await device.open();
+    firstReport = true; reportLen = null;
+    device.addEventListener('inputreport', onInput);
+    $('dot').classList.add('on');
+    $('statusText').textContent = 'Connected';
+    $('connectBtn').textContent = 'Connected';
+    $('connectBtn').disabled = true;
+    $('controls').classList.remove('locked');
+    toast('Controller connected. Try the rumble sliders.');
+    await send();
+    // Short welcome buzz
+    if (!$('msg').classList.contains('show')) { setRumble(160, 160); patternTimer = setTimeout(() => setRumble(0, 0), 180); }
+  }
+
+  if ('hid' in navigator) {
+    navigator.hid.addEventListener('disconnect', (e) => {
+      if (e.device !== device) return;
+      device = null; stopPattern();
+      $('dot').classList.remove('on'); $('statusText').textContent = 'Not connected';
+      $('battery').textContent = 'Connect to see battery level';
+      $('connectBtn').disabled = false; $('connectBtn').textContent = 'Connect controller';
+      $('controls').classList.add('locked');
+      toast('Controller disconnected', true);
+    });
+    navigator.hid.getDevices().then(ds => {
+      const d = ds.find(x => x.vendorId === SONY && PIDS.includes(x.productId));
+      if (d) open(d).catch(() => {});
+    }).catch(() => {});
+  }
+
+  // ---------- Rumble ----------
+  const pct = (v) => Math.round(v / 255 * 100) + '%';
+  function setRumble(l, r) {
+    state.rumbleL = l; state.rumbleR = r;
+    $('rumbleL').value = l; $('rumbleR').value = r;
+    $('lOut').textContent = pct(l); $('rOut').textContent = pct(r);
+    queueSend();
+  }
+  $('rumbleL').addEventListener('input', e => { stopPattern(); setRumble(+e.target.value, state.rumbleR); });
+  $('rumbleR').addEventListener('input', e => { stopPattern(); setRumble(state.rumbleL, +e.target.value); });
+  $('pulseBtn').addEventListener('click', () => { stopPattern(); setRumble(255, 255); patternTimer = setTimeout(() => setRumble(0, 0), 500); });
+
+  const patterns = {
+    heartbeat: () => [[200, 60, 120], [0, 0, 100], [255, 90, 140], [0, 0, 640]],
+    ramp: () => Array.from({ length: 40 }, (_, i) => { const v = Math.round(Math.sin(i / 39 * Math.PI) * 255); return [v, v, 60]; }),
+    pingpong: () => [[255, 0, 250], [0, 255, 250]],
+    engine: () => [[120, 30, 70], [70, 10, 70], [140, 40, 70], [80, 15, 70]],
+    rain: () => Array.from({ length: 30 }, () => Math.random() < 0.35 ? [0, 120 + Math.random() * 135 | 0, 40] : [0, 0, 40 + Math.random() * 80 | 0]),
+  };
+  function stopPattern() { clearTimeout(patternTimer); patternTimer = null; }
+  $('patternBtn').addEventListener('click', () => {
+    stopPattern();
+    const steps = patterns[$('pattern').value]();
+    let i = 0;
+    const tick = () => { const [l, r, ms] = steps[i % steps.length]; setRumble(l, r); i++; patternTimer = setTimeout(tick, ms); };
+    tick();
+  });
+  $('stopBtn').addEventListener('click', () => {
+    stopPattern(); setRumble(0, 0);
+    ['l2', 'r2'].forEach(s => { state[s].mode = 'off'; renderTrig(s); });
+    queueSend(); toast('Stopped all effects');
+  });
+
+  // ---------- Lights ----------
+  const hexToRgb = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  // Smoothly blend the lightbar from its current colour to a new one
+  let fadeRaf = null;
+  function fadeTo(target, ms = 700) {
+    cancelAnimationFrame(fadeRaf);
+    const from = [...state.color], t0 = performance.now();
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / ms);
+      const e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      state.color = from.map((f, i) => Math.round(f + (target[i] - f) * e));
+      queueSend();
+      if (k < 1) fadeRaf = requestAnimationFrame(step);
+    };
+    fadeRaf = requestAnimationFrame(step);
+  }
+  let cycleTimer = null, hue = 220;
+  function stopCycle() { clearInterval(cycleTimer); cycleTimer = null; $('cycleBtn').setAttribute('aria-pressed', 'false'); $('cycleBtn').textContent = 'Colour cycle'; }
+  function hslToRgb(h) {
+    const f = (n) => { const k = (n + h / 30) % 12; return Math.round(255 * (1 - Math.max(-1, Math.min(k - 3, 9 - k, 1)))); };
+    return [f(0), f(8), f(4)];
+  }
+  $('cycleBtn').addEventListener('click', () => {
+    if (cycleTimer) { stopCycle(); return; }
+    $('cycleBtn').setAttribute('aria-pressed', 'true'); $('cycleBtn').textContent = 'Stop cycle';
+    const next = () => { hue = (hue + 40) % 360; fadeTo(hslToRgb(hue), 1100); };
+    next(); cycleTimer = setInterval(next, 1150);
+  });
+  $('lightColor').addEventListener('input', e => { stopCycle(); fadeTo(hexToRgb(e.target.value), 200); });
+  document.querySelectorAll('[data-color]').forEach(b => b.addEventListener('click', () => {
+    stopCycle();
+    fadeTo(hexToRgb(b.dataset.color));
+    if (b.dataset.color !== '#000000') $('lightColor').value = b.dataset.color;
+  }));
+  document.querySelectorAll('#leds button').forEach(b => b.addEventListener('click', () => {
+    const on = b.getAttribute('aria-pressed') !== 'true';
+    b.setAttribute('aria-pressed', on);
+    state.playerLeds = on ? state.playerLeds | +b.dataset.bit : state.playerLeds & ~+b.dataset.bit;
+    queueSend();
+  }));
+  $('micLed').addEventListener('change', e => { state.micLed = +e.target.value; queueSend(); });
+
+  // ---------- Trigger controls ----------
+  const MODES = {
+    off: { label: 'No effect', fields: [] },
+    resist: { label: 'Constant resistance', fields: [['start', 'Starts at', 0, 9], ['strength', 'Strength', 1, 8]] },
+    weapon: { label: 'Click (gun trigger)', fields: [['start', 'Starts at', 2, 7], ['end', 'Clicks at', 3, 8], ['strength', 'Strength', 1, 8]] },
+    vibrate: { label: 'Vibration', fields: [['start', 'Starts at', 0, 9], ['strength', 'Strength', 1, 8], ['freq', 'Speed (Hz)', 1, 120]] },
+    gallop: { label: 'Galloping', fields: [['start', 'Starts at', 0, 8], ['end', 'Ends at', 1, 9], ['freq', 'Speed (Hz)', 1, 40]] },
+  };
+  function renderTrig(side) {
+    const box = document.querySelector(`.trig[data-side="${side}"] .trig-controls`);
+    const t = state[side];
+    box.innerHTML = `<h3>${side.toUpperCase()}</h3>
+      <select aria-label="${side.toUpperCase()} effect">${Object.entries(MODES).map(([k, m]) => `<option value="${k}"${k === t.mode ? ' selected' : ''}>${m.label}</option>`).join('')}</select>
+      <div class="fields"></div>
+      <div class="row"><button class="apply">Apply to ${side.toUpperCase()}</button></div>`;
+    const fields = box.querySelector('.fields');
+    MODES[t.mode].fields.forEach(([key, label, lo, hi]) => {
+      t[key] = clamp(t[key], lo, hi);
+      const l = document.createElement('label'); l.className = 'slider';
+      l.innerHTML = `<span>${label}</span><output>${t[key]}</output><input type="range" min="${lo}" max="${hi}" value="${t[key]}">`;
+      l.querySelector('input').addEventListener('input', e => { t[key] = +e.target.value; l.querySelector('output').textContent = t[key]; updateZone(side); });
+      fields.appendChild(l);
+    });
+    box.querySelector('select').addEventListener('change', e => { t.mode = e.target.value; renderTrig(side); });
+    box.querySelector('.apply').addEventListener('click', () => { queueSend(); toast(side.toUpperCase() + ': ' + MODES[t.mode].label); });
+    updateZone(side);
+  }
+  function updateZone(side) {
+    const t = state[side], z = document.querySelector(`.trig[data-side="${side}"] .zone`);
+    z.style.display = t.mode === 'off' ? 'none' : 'block';
+    z.style.top = (t.start / 10 * 100) + '%';
+  }
+  renderTrig('l2'); renderTrig('r2');
+
+  // ---------- Input report (USB, report ID 0x01) ----------
+  const BTN = [
+    ['Square', 7, 0x10], ['Cross', 7, 0x20], ['Circle', 7, 0x40], ['Triangle', 7, 0x80],
+    ['L1', 8, 0x01], ['R1', 8, 0x02], ['L2', 8, 0x04], ['R2', 8, 0x08],
+    ['Create', 8, 0x10], ['Options', 8, 0x20], ['L3', 8, 0x40], ['R3', 8, 0x80],
+    ['PS', 9, 0x01], ['Mute', 9, 0x04],
+  ];
+  const DPAD = ['Up', 'Right', 'Down', 'Left'];
+  const DPAD_MAP = [[1,0,0,0],[1,1,0,0],[0,1,0,0],[0,1,1,0],[0,0,1,0],[0,0,1,1],[0,0,0,1],[1,0,0,1]];
+  const chipEls = {};
+  [...DPAD, ...BTN.map(b => b[0])].forEach(n => { const c = document.createElement('span'); c.className = 'chip'; c.textContent = n; $('chips').appendChild(c); chipEls[n] = c; });
+
+  let latest = null, frameQueued = false, btWarned = false;
+  function onInput(e) {
+    if (e.reportId === 0x31) { if (!btWarned) { msg('The controller seems to be on Bluetooth. Connect it with a USB cable for this page.'); btWarned = true; } return; }
+    if (e.reportId !== 0x01) return;
+    latest = e.data;
+    trackFast(e.data);
+    if (!frameQueued) { frameQueued = true; requestAnimationFrame(draw); }
+  }
+  function draw() {
+    frameQueued = false;
+    const d = latest; if (!d || d.byteLength < 53) return;
+    const u = (i) => d.getUint8(i), s16 = (i) => d.getInt16(i, true);
+    document.querySelector('.trig[data-side="l2"] .fill').style.height = (u(4) / 255 * 100) + '%';
+    document.querySelector('.trig[data-side="r2"] .fill').style.height = (u(5) / 255 * 100) + '%';
+    const dp = DPAD_MAP[u(7) & 0x0f] || [0,0,0,0];
+    DPAD.forEach((n, i) => chipEls[n].classList.toggle('on', !!dp[i]));
+    BTN.forEach(([n, byte, mask]) => chipEls[n].classList.toggle('on', !!(u(byte) & mask)));
+    $('stickLWrap').classList.toggle('pressed', !!(u(8) & 0x40));
+    $('stickRWrap').classList.toggle('pressed', !!(u(8) & 0x80));
+    $('pad').classList.toggle('clicked', !!(u(9) & 0x02));
+    $('lVal').textContent = fmt(stickNow.L); $('rVal').textContent = fmt(stickNow.R);
+    $('gx').textContent = s16(15); $('gy').textContent = s16(17); $('gz').textContent = s16(19);
+    $('ax').textContent = s16(21); $('ay').textContent = s16(23); $('az').textContent = s16(25);
+    const st = u(52), lvl = Math.min(100, (st & 0x0f) * 10 + 5), chg = st >> 4;
+    $('battery').textContent = 'About ' + lvl + '%' + (chg === 1 ? ', charging' : chg === 2 ? ', fully charged' : '');
+  }
+
+  // ---------- Sticks, drift check and touchpad trails ----------
+  const STICK_TRAIL_MS = 700, PAD_TRAIL_MS = 900;
+  const norm = (v) => Math.max(-1, Math.min(1, (v - 128) / 127.5));
+  const fmt = ([x, y]) => (x >= 0 ? ' ' : '') + x.toFixed(2) + ', ' + (y >= 0 ? ' ' : '') + (-y).toFixed(2);
+  const stickNow = { L: [0, 0], R: [0, 0] };
+  const stickTrail = { L: [], R: [] };
+  const fingers = [{ active: false, id: -1, stroke: null }, { active: false, id: -1, stroke: null }];
+  let strokes = [];
+  let driftSamples = null;
+
+  function trackFast(d) {
+    if (d.byteLength < 40) return;
+    const u = (i) => d.getUint8(i), now = performance.now();
+    stickNow.L = [norm(u(0)), norm(u(1))]; stickNow.R = [norm(u(2)), norm(u(3))];
+    stickTrail.L.push({ p: stickNow.L, t: now }); stickTrail.R.push({ p: stickNow.R, t: now });
+    if (driftSamples) driftSamples.push([stickNow.L, stickNow.R]);
+    [32, 36].forEach((off, k) => {
+      const c = u(off), active = !(c & 0x80), id = c & 0x7f, f = fingers[k];
+      if (active) {
+        const x = u(off + 1) | ((u(off + 2) & 0x0f) << 8), y = (u(off + 2) >> 4) | (u(off + 3) << 4);
+        if (!f.active || f.id !== id) { f.stroke = { pts: [] }; strokes.push(f.stroke); $('padHint').style.opacity = 0; }
+        f.stroke.pts.push({ x: x / 1920, y: y / 1080, t: now });
+      }
+      f.active = active; f.id = id;
+      if (!active) f.stroke = null;
+    });
+  }
+
+  function fitCanvas(c) {
+    const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return [ctx, r.width, r.height];
+  }
+  let colors = {}, frameCount = 0;
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    ['--accent', '--line', '--hot', '--muted'].forEach(k => colors[k] = cs.getPropertyValue(k).trim());
+  }
+  readColors();
+
+  function drawStick(side) {
+    const [ctx, w, h] = fitCanvas($('stick' + side)), now = performance.now();
+    const cx = w / 2, cy = h / 2, R = w / 2 - 12;
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = colors['--line']; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([3, 3]); ctx.strokeStyle = colors['--hot'];
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.1, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    const tr = stickTrail[side];
+    while (tr.length && now - tr[0].t > STICK_TRAIL_MS) tr.shift();
+    ctx.strokeStyle = colors['--accent']; ctx.lineCap = 'round';
+    for (let i = 1; i < tr.length; i++) {
+      const a = 1 - (now - tr[i].t) / STICK_TRAIL_MS;
+      ctx.globalAlpha = a * 0.8; ctx.lineWidth = 2 + a * 4;
+      ctx.beginPath(); ctx.moveTo(cx + tr[i - 1].p[0] * R, cy + tr[i - 1].p[1] * R); ctx.lineTo(cx + tr[i].p[0] * R, cy + tr[i].p[1] * R); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    const [x, y] = stickNow[side];
+    ctx.shadowColor = colors['--accent']; ctx.shadowBlur = 14; ctx.fillStyle = colors['--accent'];
+    ctx.beginPath(); ctx.arc(cx + x * R, cy + y * R, 9, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+  }
+
+  function drawPad() {
+    const [ctx, w, h] = fitCanvas($('padCanvas')), now = performance.now();
+    ctx.clearRect(0, 0, w, h);
+    strokes.forEach(s => { while (s.pts.length > 1 && now - s.pts[0].t > PAD_TRAIL_MS) s.pts.shift(); });
+    strokes = strokes.filter(s => fingers.some(f => f.stroke === s) || (s.pts.length && now - s.pts[s.pts.length - 1].t < PAD_TRAIL_MS));
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    strokes.forEach(s => {
+      const pts = s.pts;
+      for (let pass = 0; pass < 2; pass++) {
+        // pass 0: wide coloured glow, pass 1: bright thin core
+        ctx.strokeStyle = pass ? '#ffffff' : colors['--accent'];
+        ctx.shadowColor = colors['--accent']; ctx.shadowBlur = pass ? 6 : 22;
+        for (let i = 1; i < pts.length; i++) {
+          const a = Math.max(0, 1 - (now - pts[i].t) / PAD_TRAIL_MS);
+          ctx.globalAlpha = pass ? a * 0.9 : a;
+          ctx.lineWidth = pass ? 2 + a * 3 : 6 + a * 12;
+          ctx.beginPath(); ctx.moveTo(pts[i - 1].x * w, pts[i - 1].y * h); ctx.lineTo(pts[i].x * w, pts[i].y * h); ctx.stroke();
+        }
+      }
+    });
+    ctx.globalAlpha = 1;
+    fingers.forEach(f => {
+      if (!f.active || !f.stroke || !f.stroke.pts.length) return;
+      const p = f.stroke.pts[f.stroke.pts.length - 1];
+      ctx.shadowColor = colors['--accent']; ctx.shadowBlur = 24; ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(p.x * w, p.y * h, 9, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.shadowBlur = 0;
+  }
+
+  function render() {
+    if (++frameCount % 60 === 0) readColors();
+    drawStick('L'); drawStick('R'); drawPad();
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+
+  function judge(name, pts) {
+    const n = pts.length, mx = pts.reduce((a, p) => a + p[0], 0) / n, my = pts.reduce((a, p) => a + p[1], 0) / n;
+    const off = Math.hypot(mx, my), jitter = Math.max(...pts.map(p => Math.hypot(p[0] - mx, p[1] - my)));
+    let cls, verdict;
+    if (off < 0.05 && jitter < 0.05) { cls = 'good'; verdict = 'No drift'; }
+    else if (off < 0.12 && jitter < 0.1) { cls = 'warn'; verdict = 'Slight drift. Most games’ dead zones hide this.'; }
+    else { cls = 'bad'; verdict = 'Noticeable drift. This stick may need cleaning or repair.'; }
+    return `<div class="res ${cls}"><b>${name}: ${verdict}</b><span>Rests ${Math.round(off * 100)}% off centre, wobbles up to ${Math.round(jitter * 100)}% while still.</span></div>`;
+  }
+  $('driftBtn').addEventListener('click', () => {
+    if (!device) { toast('Connect the controller first', true); return; }
+    const btn = $('driftBtn'); btn.disabled = true;
+    let n = 3;
+    const count = () => {
+      if (n > 0) { $('driftResult').innerHTML = `<div class="res"><b>Let go of both sticks…</b><span>Measuring in ${n}</span></div>`; n--; setTimeout(count, 1000); return; }
+      $('driftResult').innerHTML = '<div class="res"><b>Measuring…</b><span>Keep your hands off the sticks.</span></div>';
+      driftSamples = [];
+      setTimeout(() => {
+        const s = driftSamples; driftSamples = null; btn.disabled = false;
+        if (!s.length) { $('driftResult').innerHTML = '<div class="res bad"><b>No data received.</b><span>Make sure the controller is connected.</span></div>'; return; }
+        $('driftResult').innerHTML = judge('Left stick', s.map(x => x[0])) + judge('Right stick', s.map(x => x[1]));
+      }, 1500);
+    };
+    count();
+  });
+
+  // ---------- Quick rumble (uses the main connection when available) ----------
+  $('gpBtn').addEventListener('click', async () => {
+    if (device && device.opened) {
+      stopPattern(); setRumble(255, 255);
+      patternTimer = setTimeout(() => setRumble(0, 0), 1000);
+      $('gpStatus').textContent = 'Rumble sent.';
+      return;
+    }
+    const pads = (navigator.getGamepads ? [...navigator.getGamepads()] : []).filter(Boolean);
+    const pad = pads.find(p => p.vibrationActuator);
+    if (!pads.length) { $('gpStatus').textContent = 'No controller found yet. Press a button on it, then try again.'; return; }
+    if (!pad) { $('gpStatus').textContent = 'This browser can see the controller but can’t rumble it.'; return; }
+    try { await pad.vibrationActuator.playEffect('dual-rumble', { duration: 1000, strongMagnitude: 1, weakMagnitude: 1 }); $('gpStatus').textContent = 'Rumble sent.'; }
+    catch (e) { $('gpStatus').textContent = 'Rumble failed: ' + e.message; }
+  });
+
+  window.addEventListener('pagehide', () => {
+    if (!device) return;
+    state.rumbleL = state.rumbleR = 0; state.l2.mode = state.r2.mode = 'off';
+    const out = new Uint8Array(reportLen || 47); out.set(buildReport().subarray(0, out.length));
+    try { device.sendReport(0x02, out); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>
