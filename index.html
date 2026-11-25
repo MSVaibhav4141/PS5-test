@@ -124,6 +124,25 @@ input[type=color]{width:56px;height:40px;border:1px solid var(--line);border-rad
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{padding:5px 10px;border-radius:999px;border:1px solid var(--line);font-size:13px;color:var(--muted)}
 .chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.beta{display:inline-block;vertical-align:middle;margin-left:8px;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.hd-status{border:1px solid var(--line);border-left-width:4px;border-radius:12px;padding:12px 14px;margin:14px 0;font-size:14px;display:none}
+.hd-status.show{display:block}
+.hd-status.good{border-left-color:var(--ok)}
+.hd-status.warn{border-left-color:#E0A21B}
+.hd-status.bad{border-left-color:var(--hot)}
+.hd-status b{display:block;margin-bottom:4px}
+.hd-status ol{margin:8px 0 0;padding-left:20px;color:var(--muted)}
+.hd-status li{margin:3px 0}
+.fx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:8px}
+.fx{text-align:left;padding:14px;border-radius:14px;display:grid;gap:2px;min-height:76px;align-content:start}
+.fx b{font-size:15px}
+.fx span{font-weight:400;font-size:13px;color:var(--muted)}
+.fx.playing{border-color:var(--accent);background:var(--accent-soft)}
+.hd-cols{display:grid;grid-template-columns:1.6fr 1fr;gap:28px;margin-top:10px}
+@media (max-width:860px){.hd-cols{grid-template-columns:1fr}}
+.hold{width:100%;padding:22px;border-radius:16px;font-size:16px;touch-action:none;user-select:none;-webkit-user-select:none}
+.hold.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+[hidden]{display:none!important}
 .input-split{display:grid;grid-template-columns:auto 1fr;gap:32px;align-items:start;margin-bottom:26px}
 @media (max-width:860px){.input-split{grid-template-columns:1fr}}
 .sticks{display:flex;gap:18px;flex-wrap:wrap}
@@ -191,7 +210,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
   <div class="wrap">
     <a class="brand" href="#"><span class="brand-mark"><span></span></span>Haptic Bench</a>
     <nav aria-label="Sections">
-      <a href="#rumble">Rumble</a><a href="#triggers">Triggers</a><a href="#lights">Lights</a><a href="#input">Input</a><a href="#game">Game</a>
+      <a href="#rumble">Rumble</a><a href="#triggers">Triggers</a><a href="#hd">HD haptics</a><a href="#lights">Lights</a><a href="#input">Input</a><a href="#game">Game</a>
     </nav>
     <div class="pill"><span class="dot" id="dot"></span><span id="statusText">Not connected</span></div>
   </div>
@@ -278,6 +297,37 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
         </div>
       </section>
 
+      <section class="panel wide" id="hd">
+        <h2>HD haptics<span class="beta">Experimental</span></h2>
+        <p class="hint">The fine, detailed vibrations PS5 games use. Instead of motor commands, these are sound waves sent to the two actuators inside the grips, so you feel them rather than hear them. Needs a USB cable and Chrome or Edge.</p>
+        <div id="hdSetup">
+          <button class="primary" id="hdSetupBtn">Set up HD haptics</button>
+          <p class="hint" style="margin:10px 0 0">Your browser will ask for microphone access. That’s only so it can show the controller’s name in its list of audio devices. Nothing is recorded.</p>
+        </div>
+        <div class="hd-status" id="hdStatus" role="status"></div>
+        <div id="hdBody" hidden>
+          <div class="hd-cols">
+            <div>
+              <p class="small-h">Effects</p>
+              <div class="fx-grid" id="fxGrid"></div>
+            </div>
+            <div>
+              <p class="small-h">Free play</p>
+              <label class="slider"><span>Intensity</span><output id="hdVolOut">70%</output>
+                <input type="range" id="hdVol" min="0" max="100" value="70"></label>
+              <label class="slider"><span>Frequency</span><output id="hdFreqOut">120 Hz</output>
+                <input type="range" id="hdFreq" min="20" max="500" value="120"></label>
+              <div class="row" style="margin-bottom:12px">
+                <select id="hdSide" aria-label="Which grip"><option value="0">Both grips</option><option value="-1">Left grip</option><option value="1">Right grip</option></select>
+                <select id="hdWave" aria-label="Wave shape"><option value="sine">Smooth</option><option value="square">Buzzy</option><option value="sawtooth">Rough</option></select>
+              </div>
+              <button class="hold" id="hdHold">Hold to feel</button>
+              <div class="row"><button class="stop" id="hdStop">Stop HD haptics</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="panel wide needs" id="input">
         <h2>Live input</h2>
         <p class="hint">Everything you press, tilt or touch shows up here. Spin the sticks around the edge to check their range, and draw on the touchpad to see your trail.</p>
@@ -338,7 +388,9 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
     <details><summary>Does it work over Bluetooth?</summary>
       <p>Not yet. Bluetooth uses a different message format, so please use a USB cable for now.</p></details>
     <details><summary>Is this the same as the haptics in PS5 games?</summary>
-      <p>Close, but not identical. The most detailed PS5 haptics are sent to the controller as an audio signal, which browsers can’t do reliably. This page drives the same motors the way PC games do, plus the full adaptive trigger effects.</p></details>
+      <p>The rumble section works the way most PC games do. The HD haptics section is the real thing: over USB the controller also shows up as a 4-channel sound card, and channels 3 and 4 drive the actuators in the grips. That’s the same route PC games with full DualSense support use. It depends on your system exposing all 4 channels, which is why it’s marked experimental.</p></details>
+    <details><summary>HD haptics says only 2 channels are available</summary>
+      <p>Your computer is treating the controller as a stereo device, so the haptic channels get dropped. On Windows, open Control Panel, then Sound, select Wireless Controller, click Configure and choose Quadraphonic. On a Mac, open Audio MIDI Setup, select the controller, click Configure Speakers and choose Quadraphonic. Then restart your browser.</p></details>
     <details><summary>Does it work on Linux?</summary>
       <p>Yes, but you may need a udev rule so your browser is allowed to access the controller’s HID device.</p></details>
     <details><summary>Is my data sent anywhere?</summary>
@@ -418,13 +470,14 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
   // ---------- Output report (USB, report ID 0x02) ----------
   function buildReport() {
     const r = new Uint8Array(47);
-    r[0] = 0x01 | 0x02 | 0x04 | 0x08;
+    // In HD mode, skip the rumble-emulation flags so they don't override the audio-driven haptics
+    r[0] = (state.hdMode ? 0 : 0x01 | 0x02) | 0x04 | 0x08;
     r[1] = 0x01 | 0x04 | 0x10;
     r[2] = state.rumbleR; r[3] = state.rumbleL;
     r[8] = state.micLed;
     r.set(triggerBytes(state.r2), 10);
     r.set(triggerBytes(state.l2), 21);
-    r[38] = 0x04 | (firstReport ? 0x02 : 0);
+    r[38] = (state.hdMode ? 0 : 0x04) | (firstReport ? 0x02 : 0);
     r[41] = firstReport ? 0x02 : 0;
     r[42] = 0x00;
     r[43] = state.playerLeds | 0x20;
@@ -494,6 +547,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
   // ---------- Rumble ----------
   const pct = (v) => Math.round(v / 255 * 100) + '%';
   function setRumble(l, r) {
+    if (l || r) state.hdMode = false;
     state.rumbleL = l; state.rumbleR = r;
     $('rumbleL').value = l; $('rumbleR').value = r;
     $('lOut').textContent = pct(l); $('rOut').textContent = pct(r);
@@ -519,7 +573,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
     tick();
   });
   $('stopBtn').addEventListener('click', () => {
-    stopPattern(); setRumble(0, 0);
+    stopPattern(); setRumble(0, 0); hdStopAll();
     ['l2', 'r2'].forEach(s => { state[s].mode = 'off'; renderTrig(s); });
     queueSend(); toast('Stopped all effects');
   });
@@ -638,6 +692,201 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
     const st = u(52), lvl = Math.min(100, (st & 0x0f) * 10 + 5), chg = st >> 4;
     $('battery').textContent = 'About ' + lvl + '%' + (chg === 1 ? ', charging' : chg === 2 ? ', fully charged' : '');
   }
+
+  // ---------- HD haptics (USB audio channels 3 and 4) ----------
+  const hd = { ctx: null, busL: null, busR: null, noise: null, nodes: new Set(), timers: [], hold: null };
+  const FX = {
+    gripL:     ['Left grip', 'Three taps, left hand only'],
+    gripR:     ['Right grip', 'Three taps, right hand only'],
+    heartbeat: ['Heartbeat', 'Two deep thumps, repeated'],
+    footsteps: ['Footsteps', 'Walking, left then right'],
+    rain:      ['Rain', 'Scattered drops on both hands'],
+    clock:     ['Ticking clock', 'Tick in one hand, tock in the other'],
+    sweep:     ['Sweep', 'A hum that travels between your hands'],
+    engine:    ['Engine rev', 'Low growl that revs up'],
+    gravel:    ['Gravel road', 'Rough, crunchy texture'],
+    explosion: ['Explosion', 'A big boom that fades out'],
+  };
+
+  function hdMsg(cls, html) { const el = $('hdStatus'); el.className = 'hd-status show ' + cls; el.innerHTML = html; }
+  const QUAD_HELP = `<ol>
+      <li><b style="display:inline">Windows:</b> open Control Panel, then Sound. Select Wireless Controller, click Configure, choose Quadraphonic and finish the steps. Check its volume isn’t muted.</li>
+      <li><b style="display:inline">Mac:</b> open Audio MIDI Setup, select the controller, click Configure Speakers and choose Quadraphonic.</li>
+      <li><b style="display:inline">Linux:</b> in your sound settings, pick the 4.0 or surround profile for the controller.</li>
+      <li>Restart your browser, then press Set up HD haptics again.</li></ol>`;
+
+  $('hdSetupBtn').addEventListener('click', setupHD);
+  async function setupHD() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC || !navigator.mediaDevices || !('setSinkId' in AC.prototype)) {
+      hdMsg('bad', '<b>Your browser can’t send audio to a specific device.</b>Use Chrome or Edge, version 110 or newer, on a computer.'); return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+    } catch (e) {
+      hdMsg('bad', '<b>Microphone access was blocked.</b>Without it, the browser won’t show device names, so the controller can’t be found. Allow it from the icon at the left of the address bar, then try again.'); return;
+    }
+    const outs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audiooutput');
+    const matches = outs.filter(d => /wireless controller|dualsense/i.test(d.label));
+    const pick = matches.find(d => !['default', 'communications'].includes(d.deviceId)) || matches[0];
+    if (!pick) {
+      hdMsg('bad', '<b>Couldn’t find the controller’s audio output.</b>Make sure it’s plugged in with a USB cable (Bluetooth won’t work), wait a few seconds, then try again.' +
+        (outs.length ? '<br><br>Audio outputs found: ' + outs.map(o => o.label || 'Unnamed').join(', ') : '')); return;
+    }
+    try {
+      if (hd.ctx) await hd.ctx.close();
+      const ctx = new AC({ latencyHint: 'interactive' });
+      await ctx.setSinkId(pick.deviceId);
+      await ctx.resume();
+      const max = ctx.destination.maxChannelCount;
+      if (max < 4) {
+        await ctx.close(); hd.ctx = null;
+        hdMsg('warn', `<b>Found the controller, but your computer only gives it ${max} channels.</b>The haptics live on channels 3 and 4, so they’re being dropped. Switch the controller to 4-channel audio:` + QUAD_HELP); return;
+      }
+      ctx.destination.channelCount = max;
+      ctx.destination.channelCountMode = 'explicit';
+      ctx.destination.channelInterpretation = 'discrete';
+      const merger = ctx.createChannelMerger(max);
+      hd.busL = ctx.createGain(); hd.busR = ctx.createGain();
+      const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -6; comp.ratio.value = 8;
+      comp.channelCount = max; comp.channelCountMode = 'explicit'; comp.channelInterpretation = 'discrete'; // keep all 4 channels separate
+      const vol = +$('hdVol').value / 100;
+      hd.busL.gain.value = vol; hd.busR.gain.value = vol;
+      hd.busL.connect(merger, 0, 2);   // channel 3: left actuator
+      hd.busR.connect(merger, 0, 3);   // channel 4: right actuator
+      merger.connect(comp).connect(ctx.destination);
+      const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), data = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      hd.noise = buf; hd.ctx = ctx;
+      $('hdSetup').hidden = true; $('hdBody').hidden = false;
+      hdMsg('good', `<b>HD haptics ready on “${pick.label}”.</b>Start with Left grip and Right grip to check each side. If you hear sound from the controller’s speaker instead of feeling it, your system has the channels in a different order. Turn the controller’s volume up in your system settings if the effects feel weak.`);
+      toast('HD haptics ready');
+    } catch (e) {
+      hdMsg('bad', '<b>Couldn’t open the controller’s audio output.</b>' + e.message);
+    }
+  }
+
+  // Building blocks
+  function voice(pan) {
+    const ctx = hd.ctx, inp = ctx.createGain(), l = ctx.createGain(), r = ctx.createGain();
+    l.gain.value = pan <= 0 ? 1 : 1 - pan; r.gain.value = pan >= 0 ? 1 : 1 + pan;
+    inp.connect(l).connect(hd.busL); inp.connect(r).connect(hd.busR);
+    return { inp, l, r };
+  }
+  function track(src, until) {
+    hd.nodes.add(src);
+    src.onended = () => hd.nodes.delete(src);
+    src.stop(until);
+    return src;
+  }
+  function thump(t, freq, dur, amp, pan = 0, type = 'sine') {
+    const ctx = hd.ctx, o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(amp, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(voice(pan).inp); o.start(t); track(o, t + dur + 0.05);
+  }
+  function noise(t, dur, amp, pan = 0, ftype = 'lowpass', f = 300, q = 1) {
+    const ctx = hd.ctx, s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = hd.noise; s.loop = true; fl.type = ftype; fl.frequency.value = f; fl.Q.value = q;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(amp, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(fl).connect(g).connect(voice(pan).inp); s.start(t, Math.random()); track(s, t + dur + 0.05);
+    return g;
+  }
+
+  const PLAY = {
+    gripL(t) { for (let i = 0; i < 3; i++) thump(t + i * 0.3, 120, 0.15, 1, -1); return 1; },
+    gripR(t) { for (let i = 0; i < 3; i++) thump(t + i * 0.3, 120, 0.15, 1, 1); return 1; },
+    heartbeat(t) { for (let i = 0; i < 4; i++) { const b = t + i * 0.9; thump(b, 55, 0.14, 1); thump(b + 0.2, 50, 0.18, 0.8); } return 3.6; },
+    footsteps(t) {
+      for (let i = 0; i < 8; i++) { const b = t + i * 0.45, p = i % 2 ? 1 : -1; thump(b, 70, 0.1, 0.9, p * 0.7); noise(b, 0.07, 0.45, p * 0.7, 'lowpass', 400); }
+      return 3.6;
+    },
+    rain(t) { for (let i = 0; i < 110; i++) noise(t + Math.random() * 3.5, 0.012 + Math.random() * 0.01, 0.3 + Math.random() * 0.6, Math.random() * 2 - 1, 'bandpass', 250 + Math.random() * 250, 3); return 3.6; },
+    clock(t) { for (let i = 0; i < 10; i++) thump(t + i * 0.5, i % 2 ? 180 : 240, 0.03, 1, i % 2 ? 0.8 : -0.8, 'square'); return 5; },
+    sweep(t) {
+      const ctx = hd.ctx, o = ctx.createOscillator(), v = voice(0), g = ctx.createGain();
+      o.frequency.value = 150; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.9, t + 0.1);
+      g.gain.setValueAtTime(0.9, t + 2.9); g.gain.exponentialRampToValueAtTime(0.0001, t + 3);
+      v.l.gain.setValueAtTime(1, t); v.r.gain.setValueAtTime(0, t);
+      v.l.gain.linearRampToValueAtTime(0, t + 1.5); v.r.gain.linearRampToValueAtTime(1, t + 1.5);
+      v.l.gain.linearRampToValueAtTime(1, t + 3); v.r.gain.linearRampToValueAtTime(0, t + 3);
+      o.connect(g).connect(v.inp); o.start(t); track(o, t + 3.05); return 3;
+    },
+    engine(t) {
+      const ctx = hd.ctx, o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      o.type = 'sawtooth'; f.type = 'lowpass'; f.frequency.value = 220;
+      o.frequency.setValueAtTime(28, t); o.frequency.exponentialRampToValueAtTime(32, t + 0.8);
+      o.frequency.exponentialRampToValueAtTime(95, t + 1.8); o.frequency.exponentialRampToValueAtTime(30, t + 3.2);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.9, t + 0.2);
+      g.gain.setValueAtTime(0.9, t + 3); g.gain.exponentialRampToValueAtTime(0.0001, t + 3.4);
+      o.connect(f).connect(g).connect(voice(0).inp); o.start(t); track(o, t + 3.45); return 3.4;
+    },
+    gravel(t) {
+      const g = noise(t, 3, 0.7, 0, 'lowpass', 160);
+      for (let k = 0.05; k < 2.9; k += 0.04) g.gain.setValueAtTime(0.25 + Math.random() * 0.6, t + k);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 3);
+      return 3;
+    },
+    explosion(t) { noise(t, 1.4, 1, 0, 'lowpass', 180); thump(t, 38, 0.8, 1); thump(t + 0.05, 60, 0.4, 0.7); return 1.5; },
+  };
+
+  Object.entries(FX).forEach(([k, [title, desc]]) => {
+    const b = document.createElement('button'); b.className = 'fx'; b.dataset.fx = k;
+    b.innerHTML = `<b>${title}</b><span>${desc}</span>`;
+    b.addEventListener('click', () => playFx(k, b));
+    $('fxGrid').appendChild(b);
+  });
+  function enterHdMode() {
+    if (!state.hdMode) { stopPattern(); state.rumbleL = state.rumbleR = 0; setRumble(0, 0); state.hdMode = true; queueSend(); }
+  }
+  function playFx(k, btn) {
+    if (!hd.ctx) return;
+    enterHdMode();
+    const dur = PLAY[k](hd.ctx.currentTime + 0.03);
+    btn.classList.add('playing');
+    hd.timers.push(setTimeout(() => btn.classList.remove('playing'), dur * 1000));
+  }
+  function hdStopAll() {
+    hd.timers.forEach(clearTimeout); hd.timers = [];
+    hd.nodes.forEach(n => { try { n.stop(); } catch (e) {} }); hd.nodes.clear();
+    stopHold();
+    document.querySelectorAll('.fx.playing').forEach(b => b.classList.remove('playing'));
+  }
+  $('hdStop').addEventListener('click', hdStopAll);
+  $('hdVol').addEventListener('input', e => {
+    const v = +e.target.value / 100; $('hdVolOut').textContent = e.target.value + '%';
+    if (hd.ctx) { hd.busL.gain.setTargetAtTime(v, hd.ctx.currentTime, 0.02); hd.busR.gain.setTargetAtTime(v, hd.ctx.currentTime, 0.02); }
+  });
+  $('hdFreq').addEventListener('input', e => {
+    $('hdFreqOut').textContent = e.target.value + ' Hz';
+    if (hd.hold) hd.hold.o.frequency.setTargetAtTime(+e.target.value, hd.ctx.currentTime, 0.02);
+  });
+
+  // Hold to feel
+  function startHold(e) {
+    e.preventDefault();
+    if (!hd.ctx || hd.hold) return;
+    enterHdMode();
+    const ctx = hd.ctx, o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+    o.type = $('hdWave').value; o.frequency.value = +$('hdFreq').value;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.9, t + 0.03);
+    o.connect(g).connect(voice(+$('hdSide').value).inp); o.start(t);
+    hd.hold = { o, g };
+    $('hdHold').classList.add('active');
+    try { $('hdHold').setPointerCapture(e.pointerId); } catch (err) {}
+  }
+  function stopHold() {
+    if (!hd.hold) return;
+    const { o, g } = hd.hold, t = hd.ctx.currentTime;
+    g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    o.stop(t + 0.06); hd.hold = null;
+    $('hdHold').classList.remove('active');
+  }
+  $('hdHold').addEventListener('pointerdown', startHold);
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => $('hdHold').addEventListener(ev, stopHold));
+  $('hdHold').addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) startHold(e); });
+  $('hdHold').addEventListener('keyup', e => { if (e.key === ' ' || e.key === 'Enter') stopHold(); });
 
   // ---------- Sticks, drift check and touchpad trails ----------
   const STICK_TRAIL_MS = 700, PAD_TRAIL_MS = 900;
