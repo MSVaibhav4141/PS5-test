@@ -749,13 +749,13 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
       ctx.destination.channelInterpretation = 'discrete';
       const merger = ctx.createChannelMerger(max);
       hd.busL = ctx.createGain(); hd.busR = ctx.createGain();
-      const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -6; comp.ratio.value = 8;
-      comp.channelCount = max; comp.channelCountMode = 'explicit'; comp.channelInterpretation = 'discrete'; // keep all 4 channels separate
+      // One limiter per grip (compressors only accept up to 2 channels, so they go before the merger)
+      const mkComp = () => { const c = ctx.createDynamicsCompressor(); c.threshold.value = -6; c.ratio.value = 8; return c; };
       const vol = +$('hdVol').value / 100;
       hd.busL.gain.value = vol; hd.busR.gain.value = vol;
-      hd.busL.connect(merger, 0, 2);   // channel 3: left actuator
-      hd.busR.connect(merger, 0, 3);   // channel 4: right actuator
-      merger.connect(comp).connect(ctx.destination);
+      hd.busL.connect(mkComp()).connect(merger, 0, 2);   // channel 3: left actuator
+      hd.busR.connect(mkComp()).connect(merger, 0, 3);   // channel 4: right actuator
+      merger.connect(ctx.destination);
       const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), data = buf.getChannelData(0);
       for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
       hd.noise = buf; hd.ctx = ctx;
