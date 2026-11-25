@@ -142,6 +142,21 @@ input[type=color]{width:56px;height:40px;border:1px solid var(--line);border-rad
 @media (max-width:860px){.hd-cols{grid-template-columns:1fr}}
 .hold{width:100%;padding:22px;border-radius:16px;font-size:16px;touch-action:none;user-select:none;-webkit-user-select:none}
 .hold.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.rain-panel{margin-top:26px;padding-top:22px;border-top:1px solid var(--line)}
+.rain-panel h3{font-size:18px;margin:0 0 4px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.seg button{border:0;border-radius:0;border-right:1px solid var(--line);padding:10px 16px}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"],.toggle[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.toggle[aria-pressed="true"]{border-color:var(--accent)}
+.storm-play{margin-top:18px;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:var(--well);border-radius:16px;padding:16px}
+@media (max-width:600px){.storm-play{grid-template-columns:1fr}}
+.storm-meta{display:grid;gap:8px}
+.storm-stage{font-weight:600}
+.storm-sub{font-size:13px;color:var(--muted)}
+.progress{height:8px;border-radius:999px;background:var(--line);overflow:hidden}
+.progress div{height:100%;width:0;background:var(--accent);transition:width .25s linear}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:100}
 [hidden]{display:none!important}
 .input-split{display:grid;grid-template-columns:auto 1fr;gap:32px;align-items:start;margin-bottom:26px}
 @media (max-width:860px){.input-split{grid-template-columns:1fr}}
@@ -325,6 +340,31 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
               <div class="row"><button class="stop" id="hdStop">Stop HD haptics</button></div>
             </div>
           </div>
+          <div class="rain-panel">
+            <h3>Rain and storms</h3>
+            <p class="hint">Every drop is its own tap, landing at random on either hand. Heavier rain brings more and bigger drops plus a low wash underneath.</p>
+            <div class="row">
+              <div class="seg" role="group" aria-label="Rain strength">
+                <button data-rain="off" aria-pressed="true">No rain</button>
+                <button data-rain="light" aria-pressed="false">Light</button>
+                <button data-rain="medium" aria-pressed="false">Medium</button>
+                <button data-rain="heavy" aria-pressed="false">Heavy</button>
+              </div>
+              <button class="toggle" id="stormToggle" aria-pressed="false">Thunderstorm</button>
+            </div>
+            <div class="row">
+              <button id="thunderBtn">Distant thunder</button>
+              <button id="strikeBtn">Lightning strike</button>
+            </div>
+            <div class="storm-play">
+              <button class="primary" id="stormPlay">Play the full storm</button>
+              <div class="storm-meta">
+                <span class="storm-stage" id="stormStage">From the first drops to the storm passing</span>
+                <div class="progress" aria-hidden="true"><div id="stormBar"></div></div>
+                <span class="storm-sub" id="stormSub">About 1 minute 45 seconds. Best with the intensity slider around 70% and your eyes closed.</span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -405,6 +445,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
   </div>
 </footer>
 
+<div id="flash"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script>
@@ -700,7 +741,6 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
     gripR:     ['Right grip', 'Three taps, right hand only'],
     heartbeat: ['Heartbeat', 'Two deep thumps, repeated'],
     footsteps: ['Footsteps', 'Walking, left then right'],
-    rain:      ['Rain', 'Scattered drops on both hands'],
     clock:     ['Ticking clock', 'Tick in one hand, tock in the other'],
     sweep:     ['Sweep', 'A hum that travels between your hands'],
     engine:    ['Engine rev', 'Low growl that revs up'],
@@ -758,7 +798,13 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
       merger.connect(ctx.destination);
       const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), data = buf.getChannelData(0);
       for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-      hd.noise = buf; hd.ctx = ctx;
+      // Brown noise: most of its energy is in the low range the actuators feel best
+      const bb = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate), bd = bb.getChannelData(0);
+      let last = 0, peak = 0;
+      for (let i = 0; i < bd.length; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; bd[i] = last; peak = Math.max(peak, Math.abs(last)); }
+      for (let i = 0; i < bd.length; i++) bd[i] /= peak;
+      hd.noise = buf; hd.brown = bb; hd.ctx = ctx;
+      rain.voices = null;
       $('hdSetup').hidden = true; $('hdBody').hidden = false;
       hdMsg('good', `<b>HD haptics ready on “${pick.label}”.</b>Start with Left grip and Right grip to check each side. If you hear sound from the controller’s speaker instead of feeling it, your system has the channels in a different order. Turn the controller’s volume up in your system settings if the effects feel weak.`);
       toast('HD haptics ready');
@@ -774,9 +820,9 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
     inp.connect(l).connect(hd.busL); inp.connect(r).connect(hd.busR);
     return { inp, l, r };
   }
-  function track(src, until) {
+  function track(src, until, v) {
     hd.nodes.add(src);
-    src.onended = () => hd.nodes.delete(src);
+    src.onended = () => { hd.nodes.delete(src); if (v) { try { v.inp.disconnect(); v.l.disconnect(); v.r.disconnect(); } catch (e) {} } };
     src.stop(until);
     return src;
   }
@@ -784,13 +830,13 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
     const ctx = hd.ctx, o = ctx.createOscillator(), g = ctx.createGain();
     o.type = type; o.frequency.value = freq;
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(amp, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(voice(pan).inp); o.start(t); track(o, t + dur + 0.05);
+    const v = voice(pan); o.connect(g).connect(v.inp); o.start(t); track(o, t + dur + 0.05, v);
   }
   function noise(t, dur, amp, pan = 0, ftype = 'lowpass', f = 300, q = 1) {
     const ctx = hd.ctx, s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
     s.buffer = hd.noise; s.loop = true; fl.type = ftype; fl.frequency.value = f; fl.Q.value = q;
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(amp, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(fl).connect(g).connect(voice(pan).inp); s.start(t, Math.random()); track(s, t + dur + 0.05);
+    const v = voice(pan); s.connect(fl).connect(g).connect(v.inp); s.start(t, Math.random()); track(s, t + dur + 0.05, v);
     return g;
   }
 
@@ -802,7 +848,6 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
       for (let i = 0; i < 8; i++) { const b = t + i * 0.45, p = i % 2 ? 1 : -1; thump(b, 70, 0.1, 0.9, p * 0.7); noise(b, 0.07, 0.45, p * 0.7, 'lowpass', 400); }
       return 3.6;
     },
-    rain(t) { for (let i = 0; i < 110; i++) noise(t + Math.random() * 3.5, 0.012 + Math.random() * 0.01, 0.3 + Math.random() * 0.6, Math.random() * 2 - 1, 'bandpass', 250 + Math.random() * 250, 3); return 3.6; },
     clock(t) { for (let i = 0; i < 10; i++) thump(t + i * 0.5, i % 2 ? 180 : 240, 0.03, 1, i % 2 ? 0.8 : -0.8, 'square'); return 5; },
     sweep(t) {
       const ctx = hd.ctx, o = ctx.createOscillator(), v = voice(0), g = ctx.createGain();
@@ -811,7 +856,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
       v.l.gain.setValueAtTime(1, t); v.r.gain.setValueAtTime(0, t);
       v.l.gain.linearRampToValueAtTime(0, t + 1.5); v.r.gain.linearRampToValueAtTime(1, t + 1.5);
       v.l.gain.linearRampToValueAtTime(1, t + 3); v.r.gain.linearRampToValueAtTime(0, t + 3);
-      o.connect(g).connect(v.inp); o.start(t); track(o, t + 3.05); return 3;
+      o.connect(g).connect(v.inp); o.start(t); track(o, t + 3.05, v); return 3;
     },
     engine(t) {
       const ctx = hd.ctx, o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
@@ -820,7 +865,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
       o.frequency.exponentialRampToValueAtTime(95, t + 1.8); o.frequency.exponentialRampToValueAtTime(30, t + 3.2);
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.9, t + 0.2);
       g.gain.setValueAtTime(0.9, t + 3); g.gain.exponentialRampToValueAtTime(0.0001, t + 3.4);
-      o.connect(f).connect(g).connect(voice(0).inp); o.start(t); track(o, t + 3.45); return 3.4;
+      const v = voice(0); o.connect(f).connect(g).connect(v.inp); o.start(t); track(o, t + 3.45, v); return 3.4;
     },
     gravel(t) {
       const g = noise(t, 3, 0.7, 0, 'lowpass', 160);
@@ -830,6 +875,211 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
     },
     explosion(t) { noise(t, 1.4, 1, 0, 'lowpass', 180); thump(t, 38, 0.8, 1); thump(t + 0.05, 60, 0.4, 0.7); return 1.5; },
   };
+
+  // ---------- Rain and storm engine ----------
+  // Drops arrive at random (a Poisson process) at a rate that can glide smoothly between levels.
+  const RAIN = {            // drops per second, low "wash" level underneath
+    off: [0, 0], drizzle: [3, 0], light: [9, 0.04], medium: [26, 0.12], heavy: [55, 0.24], downpour: [85, 0.34],
+  };
+  const rain = { timer: null, rate: [0, 0, 0, 0], bed: [0, 0, 0, 0], next: 0, bedNode: null, voices: null, storm: false, nextStorm: 0 };
+  const lerpAt = (k, now) => now >= k[3] ? k[1] : k[0] + (k[1] - k[0]) * Math.max(0, (now - k[2]) / (k[3] - k[2]));
+
+  function rainVoices() {
+    if (!rain.voices) rain.voices = [-1, -0.6, -0.25, 0.25, 0.6, 1].map(p => voice(p));
+    return rain.voices;
+  }
+  function drop(t, amp) {
+    // A raindrop: a short, quickly-decaying "plink" that dips slightly in pitch, plus a tiny click on impact
+    const ctx = hd.ctx, vs = rainVoices(), v = vs[(Math.random() * vs.length) | 0];
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    const f = 120 + Math.random() * 160, dur = 0.035 + Math.random() * 0.045;
+    o.frequency.setValueAtTime(f * 1.35, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.02);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(amp, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(v.inp); o.start(t); track(o, t + dur + 0.02);
+    const s = ctx.createBufferSource(), cg = ctx.createGain(), fl = ctx.createBiquadFilter();
+    s.buffer = hd.noise; fl.type = 'lowpass'; fl.frequency.value = 900;
+    cg.gain.setValueAtTime(amp * 0.6, t); cg.gain.exponentialRampToValueAtTime(0.0001, t + 0.008);
+    s.connect(fl).connect(cg).connect(v.inp); s.start(t, Math.random()); track(s, t + 0.02);
+  }
+  function ensureBed() {
+    if (rain.bedNode) return;
+    const ctx = hd.ctx, s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain(), v = voice(0);
+    s.buffer = hd.brown; s.loop = true; fl.type = 'lowpass'; fl.frequency.value = 220; g.gain.value = 0;
+    s.connect(fl).connect(g).connect(v.inp); s.start();
+    rain.bedNode = { s, g, v };
+  }
+  function setRain(level, ramp) {
+    if (!hd.ctx) return;
+    const now = hd.ctx.currentTime, [r, b] = RAIN[level];
+    rain.rate = [lerpAt(rain.rate, now), r, now, now + ramp];
+    rain.bed = [lerpAt(rain.bed, now), b, now, now + ramp];
+    if (r > 0 && !rain.timer) {
+      enterHdMode(); ensureBed();
+      rain.next = now + 0.05;
+      rain.timer = setInterval(rainTick, 40);
+    }
+  }
+  function setRainLevel(level, ramp = 2) {
+    if (hd.ctx) setRain(level, ramp);
+    document.querySelectorAll('[data-rain]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.rain === level)));
+  }
+  function rainTick() {
+    const ctx = hd.ctx, now = ctx.currentTime, ahead = now + 0.15;
+    // Schedule every drop that falls inside the next 150 ms
+    while (rain.next < ahead) {
+      const r = lerpAt(rain.rate, rain.next);
+      if (r < 0.2) { rain.next = ahead; break; }
+      if (rain.next >= now) {
+        const heavy = Math.min(1, r / 60);
+        drop(rain.next, (0.35 + Math.random() * 0.65) * (0.7 + 0.3 * heavy));
+      }
+      rain.next += -Math.log(1 - Math.random()) / r;
+    }
+    // The low wash flutters a little so it feels like water, not a hum
+    const bed = lerpAt(rain.bed, now);
+    rain.bedNode.g.gain.setTargetAtTime(bed * (0.75 + Math.random() * 0.5) * 2.2, now, 0.06);
+    // Thunderstorm mode: random thunder and the occasional strike
+    if (rain.storm && now > rain.nextStorm) {
+      if (Math.random() < 0.3) strike(); else thunder(0.6 + Math.random() * 0.35);
+      rain.nextStorm = now + 9 + Math.random() * 14;
+    }
+    // Shut down once the rain has fully faded
+    if (rain.rate[1] === 0 && now > rain.rate[3] + 0.5) stopRain();
+  }
+  function stopRain() {
+    clearInterval(rain.timer); rain.timer = null;
+    if (rain.bedNode) {
+      const { s, g, v } = rain.bedNode, t = hd.ctx.currentTime;
+      g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, 0.1); s.stop(t + 0.6);
+      s.onended = () => { try { v.inp.disconnect(); v.l.disconnect(); v.r.disconnect(); } catch (e) {} };
+      rain.bedNode = null;
+    }
+  }
+
+  function rumble(t, dur, amp, cutoff) {
+    // Thunder: brown noise with irregular swells that rolls slowly from one hand to the other
+    const ctx = hd.ctx, s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain(), v = voice(0);
+    s.buffer = hd.brown; s.loop = true; fl.type = 'lowpass'; fl.frequency.value = cutoff;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(amp * 0.5, t + 0.3 + Math.random() * 0.3);
+    for (let k = 0.5; k < dur - 1; k += 0.12 + Math.random() * 0.2) {
+      const fade = 1 - k / dur;
+      g.gain.linearRampToValueAtTime(amp * fade * (0.35 + Math.random() * 0.65), t + k);
+    }
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const from = Math.random() < 0.5 ? -1 : 1, mid = (Math.random() - 0.5) * 0.6;
+    const setPan = (p, at) => { v.l.gain.linearRampToValueAtTime(p <= 0 ? 1 : 1 - p, at); v.r.gain.linearRampToValueAtTime(p >= 0 ? 1 : 1 + p, at); };
+    v.l.gain.setValueAtTime(from <= 0 ? 1 : 0.3, t); v.r.gain.setValueAtTime(from >= 0 ? 1 : 0.3, t);
+    setPan(mid, t + dur * 0.5); setPan(-from * 0.7, t + dur);
+    s.connect(fl).connect(g).connect(v.inp); s.start(t, Math.random() * 3); track(s, t + dur + 0.05, v);
+    // A deep tone underneath gives the rumble its weight
+    const o = ctx.createOscillator(), og = ctx.createGain(), ov = voice(0);
+    o.frequency.value = 34 + Math.random() * 8;
+    og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(amp * 0.45, t + 0.6); og.gain.exponentialRampToValueAtTime(0.0001, t + dur * 0.8);
+    o.connect(og).connect(ov.inp); o.start(t); track(o, t + dur, ov);
+  }
+  function thunder(amp = 0.8) {
+    if (!hd.ctx) return;
+    enterHdMode();
+    // Far away: a faint flash first, then the rumble arrives seconds later
+    flash(0.12);
+    const delay = 1.5 + Math.random() * 2;
+    rumble(hd.ctx.currentTime + delay, 4 + Math.random() * 3, amp, 110);
+  }
+  function strike() {
+    if (!hd.ctx) return;
+    enterHdMode();
+    const t = hd.ctx.currentTime + 0.02;
+    flash(0.4, true);
+    // The crack, the boom, then the long roll
+    noise(t, 0.09, 1, 0, 'lowpass', 1400);
+    noise(t + 0.05, 0.12, 0.8, 0, 'lowpass', 900);
+    thump(t + 0.02, 44, 0.7, 1);
+    thump(t + 0.04, 70, 0.3, 0.8);
+    rumble(t + 0.25, 6 + Math.random() * 2, 1, 160);
+  }
+
+  // Lightning on screen and on the controller's lightbar
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  function flash(strength, onBar) {
+    if (!reduceMotion.matches) {
+      const f = $('flash'), seq = [[0, strength], [70, strength * 0.15], [130, strength * 0.8], [190, 0]];
+      seq.forEach(([ms, o]) => setTimeout(() => { f.style.transition = ms === 190 ? 'opacity .6s ease-out' : 'none'; f.style.opacity = o; }, ms));
+    }
+    if (onBar && device) {
+      cancelAnimationFrame(fadeRaf); stopCycle();
+      const back = [...state.color];
+      state.color = [255, 255, 255]; send();
+      setTimeout(() => { state.color = [30, 30, 50]; send(); }, 70);
+      setTimeout(() => { state.color = [230, 230, 255]; send(); }, 130);
+      setTimeout(() => fadeTo(back, 900), 200);
+    }
+  }
+
+  // Controls
+  document.querySelectorAll('[data-rain]').forEach(b => b.addEventListener('click', () => {
+    if (!hd.ctx) return;
+    stopStormShow(); setRainLevel(b.dataset.rain);
+    if (b.dataset.rain === 'off') { rain.storm = false; $('stormToggle').setAttribute('aria-pressed', 'false'); }
+  }));
+  $('stormToggle').addEventListener('click', () => {
+    if (!hd.ctx) return;
+    stopStormShow();
+    rain.storm = !rain.storm;
+    $('stormToggle').setAttribute('aria-pressed', String(rain.storm));
+    if (rain.storm) {
+      if (!rain.timer || rain.rate[1] < RAIN.medium[0]) setRainLevel('heavy');
+      rain.nextStorm = hd.ctx.currentTime + 2;
+    }
+  });
+  $('thunderBtn').addEventListener('click', () => thunder(0.85));
+  $('strikeBtn').addEventListener('click', strike);
+
+  // The full storm: a scripted ~105 second journey
+  const STORM = [
+    [0,   'rain', 'drizzle', 4, 'The first drops'],
+    [9,   'rain', 'light', 6, 'Light rain'],
+    [22,  'rain', 'medium', 8, 'The rain picks up'],
+    [29,  'thunder', 0.55],
+    [37,  'rain', 'heavy', 6, 'Heavy rain'],
+    [43,  'thunder', 0.75],
+    [50,  'rain', 'downpour', 4, 'Thunderstorm overhead'],
+    [53,  'strike'],
+    [60,  'thunder', 0.9],
+    [65,  'strike'],
+    [72,  'rain', 'heavy', 6, 'The storm moves away'],
+    [76,  'thunder', 0.5],
+    [82,  'rain', 'medium', 8, 'Easing off'],
+    [88,  'thunder', 0.3],
+    [91,  'rain', 'light', 6, 'Light rain again'],
+    [98,  'rain', 'drizzle', 4, 'The last drops'],
+    [103, 'rain', 'off', 3, 'Clearing'],
+  ];
+  const STORM_LEN = 106;
+  const show = { timers: [], bar: null, start: 0 };
+  function stopStormShow() {
+    show.timers.forEach(clearTimeout); show.timers = []; clearInterval(show.bar); show.bar = null;
+    $('stormPlay').textContent = 'Play the full storm';
+    $('stormBar').style.width = '0';
+    $('stormStage').textContent = 'From the first drops to the storm passing';
+  }
+  $('stormPlay').addEventListener('click', () => {
+    if (!hd.ctx) return;
+    if (show.bar) { stopStormShow(); setRainLevel('off', 1.5); return; }
+    rain.storm = false; $('stormToggle').setAttribute('aria-pressed', 'false');
+    $('stormPlay').textContent = 'Stop the storm';
+    show.start = performance.now();
+    STORM.forEach(([at, kind, a, ramp, label]) => show.timers.push(setTimeout(() => {
+      if (kind === 'rain') { setRainLevel(a, ramp); $('stormStage').textContent = label; }
+      else if (kind === 'thunder') thunder(a);
+      else strike();
+    }, at * 1000)));
+    show.timers.push(setTimeout(() => { stopStormShow(); $('stormStage').textContent = 'The storm has passed'; }, STORM_LEN * 1000));
+    show.bar = setInterval(() => {
+      const k = Math.min(1, (performance.now() - show.start) / (STORM_LEN * 1000));
+      $('stormBar').style.width = (k * 100) + '%';
+    }, 250);
+  });
 
   Object.entries(FX).forEach(([k, [title, desc]]) => {
     const b = document.createElement('button'); b.className = 'fx'; b.dataset.fx = k;
@@ -848,6 +1098,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
     hd.timers.push(setTimeout(() => btn.classList.remove('playing'), dur * 1000));
   }
   function hdStopAll() {
+    stopStormShow(); setRainLevel('off', 0.4); rain.storm = false; $('stormToggle').setAttribute('aria-pressed', 'false');
     hd.timers.forEach(clearTimeout); hd.timers = [];
     hd.nodes.forEach(n => { try { n.stop(); } catch (e) {} }); hd.nodes.clear();
     stopHold();
